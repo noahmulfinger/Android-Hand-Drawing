@@ -29,6 +29,8 @@ public class DrawingView extends View implements OnTouchListener {
 
 	private static final float TOUCH_TOLERANCE = 4;
 
+	private static final int STROKE_WIDTH = 40;
+
 	private boolean isEraserActive = false;
 
 	public DrawingView(Context context, AttributeSet attr) {
@@ -54,7 +56,7 @@ public class DrawingView extends View implements OnTouchListener {
 		m_Paint.setStyle(Paint.Style.STROKE);
 		m_Paint.setStrokeJoin(Paint.Join.ROUND);
 		m_Paint.setStrokeCap(Paint.Cap.ROUND);
-		m_Paint.setStrokeWidth(2);
+		m_Paint.setStrokeWidth(STROKE_WIDTH);
 
 		m_Canvas = new Canvas();
 		 
@@ -108,7 +110,7 @@ public class DrawingView extends View implements OnTouchListener {
 			 
 		} else { 
 			m_Paint.setColor(Color.BLACK);
-			m_Paint.setStrokeWidth(2);
+			m_Paint.setStrokeWidth(STROKE_WIDTH);
 			Paint newPaint = new Paint(m_Paint); // Clones the mPaint object
 			paths.add(new Pair<Path, Paint>(m_Path, newPaint));
 			 

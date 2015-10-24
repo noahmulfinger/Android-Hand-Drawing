@@ -1,14 +1,18 @@
 package com.swap.handdrawing;
 
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -21,6 +25,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.UUID;
 
 public class MainActivity extends Activity implements OnClickListener {
@@ -55,14 +61,14 @@ public class MainActivity extends Activity implements OnClickListener {
             btnSave = (ImageButton) findViewById(R.id.btnSave);
             btnSave.setOnClickListener(this);
 
-            btnShare = (ImageButton) findViewById(R.id.btnShare);
-            btnShare.setOnClickListener(this);
+//            btnShare = (ImageButton) findViewById(R.id.btnShare);
+//            btnShare.setOnClickListener(this);
 
             btnCamera = (ImageButton) findViewById(R.id.btnCamera);
             btnCamera.setOnClickListener(this);
 
-            eraser = (ImageView) findViewById(R.id.eraser);
-            eraser.setOnClickListener(this);
+//            eraser = (ImageView) findViewById(R.id.eraser);
+//            eraser.setOnClickListener(this);
         }
     }
 
@@ -109,11 +115,11 @@ public class MainActivity extends Activity implements OnClickListener {
 
         } else if (v == btnShare) {
 
-            Intent share = new Intent(Intent.ACTION_SEND);
-            share.setType("image/png");
-
-            share.putExtra(Intent.EXTRA_STREAM, Uri.parse(saveImage().getAbsolutePath())); //"file:///sdcard/temporary_file.jpg"
-            startActivity(Intent.createChooser(share, "Share Image"));
+//            Intent share = new Intent(Intent.ACTION_SEND);
+//            share.setType("image/png");
+//
+//            share.putExtra(Intent.EXTRA_STREAM, Uri.parse(saveImage().getAbsolutePath())); //"file:///sdcard/temporary_file.jpg"
+//            startActivity(Intent.createChooser(share, "Share Image"));
 
         } else if (v == btnChooseImage) {
 
@@ -125,19 +131,79 @@ public class MainActivity extends Activity implements OnClickListener {
 
     }
 
+    private byte[] colorToByte(int color) {
+        return new byte[] { (byte)(Color.red(color) / 2),
+                            (byte)(Color.green(color) / 2),
+                            (byte)(Color.blue(color) / 2) };
+        }
 
-    public File saveImage() {
+
+    public void saveImage() {
         drawingView.setDrawingCacheEnabled(true);
         Bitmap bm = drawingView.getDrawingCache();
 
-        File fPath = Environment.getExternalStorageDirectory();
 
-        File f = null;
+        int size = bm.getRowBytes()*bm.getHeight()*4;
+        ByteBuffer buf = ByteBuffer.allocate(size);
+        bm.copyPixelsToBuffer(buf);
+        byte[] byt = buf.array();
+        for(int ctr=0;ctr<size;ctr+=4)
+        {
+            int red = ctr;
+            int green = ctr+1;
+            int blue = ctr+2;
 
-        f = new File(fPath, UUID.randomUUID().toString() + ".png");
+            byte[] codes = colorToByte(Color.LTGRAY);
+
+            if (byt[red] == codes[0] || byt[green] == codes[1] || byt[blue] == codes[2]) {
+            } else {
+                byt[red] = 127;
+                byt[green] = 0;
+                byt[blue] = 0;
+            }
+
+        }
+        ByteBuffer retBuf = ByteBuffer.wrap(byt);
+        bm.copyPixelsFromBuffer(retBuf);
+
+
+        File mediaStorageDir = new File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                "Draw");
+
+        if (!mediaStorageDir.exists()) {
+            if (!mediaStorageDir.mkdirs()) {
+                System.out.println("failed to create directory");
+                return;
+            }
+        }
+
+        File pictureFile = new File(mediaStorageDir.getPath() +
+                File.separator + "photo" + System.currentTimeMillis() + ".png");
+//
+//        try {
+//            FileOutputStream fos = new FileOutputStream(pictureFile);
+//            fos.write(data);
+//            fos.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+
+
+        System.out.println("Path taken photo: " + pictureFile.getAbsolutePath());
+        String path = pictureFile.getAbsolutePath();
+
+
+
+//        File fPath = Environment.getExternalStorageDirectory();
+//
+//        File f = null;
+
+//        f = new File(fPath, UUID.randomUUID().toString() + ".png");
 
         try {
-            FileOutputStream strm = new FileOutputStream(f);
+            FileOutputStream strm = new FileOutputStream(pictureFile);
             bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
             strm.close();
 
@@ -146,7 +212,21 @@ public class MainActivity extends Activity implements OnClickListener {
             e.printStackTrace();
         }
 
-        return f;
+        attachMetaData(pictureFile);
+    }
+
+    private void attachMetaData(File file) {
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.TITLE, "title");
+        values.put(MediaStore.Images.Media.DESCRIPTION, "desc");
+        values.put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis());
+        values.put(MediaStore.Images.ImageColumns.BUCKET_ID, file.toString().toLowerCase(Locale.US).hashCode());
+        values.put(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME, file.getName().toLowerCase(Locale.US));
+        values.put("_data", file.getAbsolutePath());
+
+        ContentResolver cr = getContentResolver();
+        cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+
     }
 
     @Override
